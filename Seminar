@@ -1,0 +1,200 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+import numpy as np
+import statistics
+
+def estimate_alpha(x,x_min):
+    n=len(x)
+    sigma = 0
+    for i in range(n):
+        sigma = sigma + math.log(float(x[i]/(x_min-0.5)))
+    return (1+n*(sigma**(-1)))
+    
+def p(x,x_min,alpha):
+    if x >= x_min:
+        return ((alpha -1)/x_min)*((x/(x_min))**(-alpha))
+    else:
+        return 0
+        
+def f_inverse(y,x_min,alpha):
+    return (x_min*((1-y)**(1/(1-alpha))))
+ 
+def generate_sampels(x_min,alpha,amount):
+    t_points = []
+    for i in range(amount):
+        y = np.random.random_sample()
+        t = f_inverse(y,x_min,alpha)
+        t_points.append(t)
+        t_points.sort()
+    return t_points
+
+def KS_function(xmins,Z):
+    KS = []
+    alphas = []
+    
+    for i in range(len(xmins)):
+        # choose next xmin candidate
+        xmin = xmins[i] 
+        # truncate data below this xmin value
+        Z1 = []
+        for z in Z:
+            if z>=xmin:
+                Z1.append(z) 
+        n = len(Z1)
+        # estimate alpha using direct MLE
+        a = estimate_alpha(x=Z1,x_min=xmin) 
+        alphas.append(a)
+        # construct thZe empirical CDF - steps function 1/n
+        cx = []
+        for j in range(n,0,-1):
+            cx.append(j/n)
+        # construct the fitted theoretical CDF    
+        cf = []
+        for z1 in Z1:
+            cf.append((z1/xmin)**(1-a))
+        # compute the KS statistic 
+        abs_diff = []
+        for k in range(len(cf[:n])):
+            abs_diff.append(cf[k] - cx[k])
+        KS.append(max(abs_diff))
+
+    # find minimum of KS
+    new_KS=[]
+    for ks in KS:
+        if ks>0:
+            new_KS.append(ks)
+    min_ks = min(new_KS)
+    xmin_index = KS.index(min_ks)
+    result_x_min = xmins[xmin_index]
+    result_alpha = alphas[xmin_index]
+    return (result_x_min,result_alpha,min_ks)
+ 
+def KS_function_for_EXPONENTIAL(xmins,Z):
+    KS = []
+    lambdas = []
+    
+    for i in range(len(xmins)):
+        # choose next xmin candidate
+        xmin = xmins[i] 
+        # truncate data below this xmin value
+        Z1 = []
+        for z in Z:
+            if z>=xmin:
+                Z1.append(z) 
+        n = len(Z1)
+        # estimate lambda using direct MLE
+        if len(Z1) > 1:
+            l = 1/(statistics.mean(Z1)-xmin)
+        else:
+            l=0
+        lambdas.append(l)
+        # construct thZe empirical CDF - steps function 1/n
+        cx = []
+        for j in range(n,0,-1):
+            cx.append(j/n)
+        # construct the fitted theoretical CDF    cf = 1 - exp(lambda*(xmin-z2)) 
+        cf = []
+        for z1 in Z1:
+            cf.append(1 - np.exp(l*(xmin-z1)))
+        # compute the KS statistic 
+        abs_diff = []
+        for k in range(len(cf[:n])):
+            abs_diff.append(cf[k] - cx[k])
+        KS.append(max(abs_diff))
+
+    # find minimum of KS
+    new_KS=[]
+    for ks in KS:
+        if ks>0:
+            new_KS.append(ks)
+    min_ks = min(new_KS)
+    xmin_index = KS.index(min_ks)
+    result_x_min = xmins[xmin_index]
+    result_lambda = 1/abs(statistics.mean(Z)-result_x_min)
+    return (result_x_min,result_lambda,min_ks)
+    
+#running all
+df = pd.read_excel(r"sales.xlsx")
+year=2000
+d = df[['Kind of Business',year]].sort_values(by=[year],ascending=False)
+d = d.reset_index(drop=True)
+d1 = d[year]
+d1 = d1.sort_values()
+
+xmins = list(d1)
+xmins.sort()
+Z = list(d1)
+Z.sort()
+result_x_min,result_alpha,min_ks = KS_function(xmins,Z)
+print(f'model found that x_min is {result_x_min} and alpha is {result_alpha} with KS score of {min_ks}')
+
+p_x=[]
+for x_i in Z:
+    p_x.append(p(x=x_i, x_min=result_x_min, alpha=result_alpha))
+p_x.sort(reverse=True)    
+
+fig=plt.figure()
+ax=fig.add_subplot(111, label="1")
+ax2=fig.add_subplot(111, label="2", frame_on=False)
+
+ax.plot(d1, color="b",label = 'observed data')
+ax.set_xlabel("x")
+ax.set_ylabel("Sales", color="b")
+ax.tick_params(axis='x')
+ax.tick_params(axis='y', colors="b")
+
+ax2.plot(p_x,color="g",label = 'fitted data')
+# ax2.xaxis.tick_top()
+ax2.yaxis.tick_right()
+# ax2.set_xlabel('x', color="g") 
+ax2.set_ylabel('p(x)', color="g")       
+ax2.xaxis.set_label_position('top') 
+ax2.yaxis.set_label_position('right') 
+ax2.tick_params(axis='x')
+ax2.tick_params(axis='y', colors="g")
+ax.legend(loc=1)
+ax2.legend(loc=3)
+plt.show()
+
+testresult = []
+syntatic_data_amount = 2500
+for i in range(syntatic_data_amount):
+     #randomly generate power law data using the parameters we found
+    power = []
+    samples = generate_sampels(x_min = result_x_min,alpha = result_alpha,amount = len(list(d1)))
+    for x_i in samples:
+        power.append(p(x=x_i, x_min=result_x_min, alpha=result_alpha))
+    # checking KS statistic
+    test_x_min,test_alpha,ks_s = KS_function(samples,samples)
+    testresult.append(ks_s)
+
+p_value = 0
+for t in testresult:
+    if t > min_ks:
+        p_value = p_value +1
+
+p_value = p_value / syntatic_data_amount
+print(f'within goodness of fit check, p_value is {p_value}')
+
+#check alternative
+exp_x_min,exp_lambda,exp_min_ks = KS_function_for_EXPONENTIAL(xmins,Z)
+print(f'model found that x_min is {exp_x_min} and lambda is {exp_lambda} with KS score of {exp_min_ks}')
+
+exp_testresult = []
+syntatic_data_amount = 2500
+for i in range(syntatic_data_amount):
+     #randomly generate power law data using the parameters we found
+    exp_samples = list(np.random.exponential(1/exp_lambda, len(list(d1))))
+    exp_samples.sort()
+    # checking KS statistic
+    exp_test_x_min,exp_test_lamnda,exp_ks_s = KS_function_for_EXPONENTIAL(exp_samples,exp_samples)
+    exp_testresult.append(exp_ks_s)
+    
+exp_p_value = 0
+for t in exp_testresult:
+    if t > exp_min_ks:
+        exp_p_value = exp_p_value +1
+
+exp_p_value = exp_p_value / syntatic_data_amount
+print(f'within goodness of fit check, p_value is {exp_p_value}')
