@@ -8,7 +8,7 @@ def estimate_alpha(x,x_min):
     n=len(x)
     sigma = 0
     for i in range(n):
-        sigma = sigma + math.log(float(x[i]/(x_min-0.5)))
+        sigma = sigma + math.log(float(x[i]/(x_min)))
     return (1+n*(sigma**(-1)))
     
 def p(x,x_min,alpha):
