@@ -56,7 +56,7 @@ def KS_function(xmins,Z):
         # compute the KS statistic 
         abs_diff = []
         for k in range(len(cf[:n])):
-            abs_diff.append(cf[k] - cx[k])
+            abs_diff.append(abs(cf[k] - cx[k]))
         KS.append(max(abs_diff))
 
     # find minimum of KS
@@ -100,7 +100,7 @@ def KS_function_for_EXPONENTIAL(xmins,Z):
         # compute the KS statistic 
         abs_diff = []
         for k in range(len(cf[:n])):
-            abs_diff.append(cf[k] - cx[k])
+            abs_diff.append(abs(cf[k] - cx[k]))
         KS.append(max(abs_diff))
 
     # find minimum of KS
